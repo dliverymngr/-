@@ -1,0 +1,1233 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delivery Manager | Painel Master</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=Bebas+Neue&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <!-- Firebase SDKs -->
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+      import { getFirestore, collection, addDoc, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, limit, where, Timestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+      import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+      const firebaseConfig = {
+        apiKey: "AIzaSyCZwWklTlIDsB4HJENTsL0CLKI4rOKwMQg",
+        authDomain: "admin-5b03c.firebaseapp.com",
+        projectId: "admin-5b03c",
+        storageBucket: "admin-5b03c.firebasestorage.app",
+        messagingSenderId: "590351148815",
+        appId: "1:590351148815:web:e8f691597ab8e08a9cc07a",
+        measurementId: "G-BWWL0QQFH6"
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+      const auth = getAuth(app);
+
+      window.firebaseApp = app;
+      window.firebaseDb = db;
+      window.firebaseAuth = auth;
+      window.firebaseModules = {
+        firestore: {
+          getFirestore,
+          collection,
+          addDoc,
+          getDocs,
+          doc,
+          getDoc,
+          setDoc,
+          updateDoc,
+          deleteDoc,
+          onSnapshot,
+          query,
+          orderBy,
+          limit,
+          where,
+          Timestamp
+        },
+        auth: {
+          getAuth,
+          createUserWithEmailAndPassword,
+          signInWithEmailAndPassword,
+          signOut,
+          onAuthStateChanged
+        }
+      };
+
+      console.log("✅ Firebase inicializado com sucesso!");
+    </script>
+
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #f1f5f9; }
+        .font-bebas { font-family: 'Bebas Neue', cursive; }
+        
+        /* Status de assinatura */
+        .status-ativo { background-color: #dcfce7; border-left: 6px solid #16a34a; }
+        .status-vencido { background-color: #fee2e2; border-left: 6px solid #dc2626; }
+        .status-vencendo { background-color: #fef9c3; border-left: 6px solid #eab308; }
+        .status-bloqueado { background-color: #f1f5f9; border-left: 6px solid #6b7280; opacity: 0.7; }
+        
+        /* Status de cadastro */
+        .status-pendente { background-color: #fff7ed; border-left: 6px solid #f97316; }
+        .status-rejeitado { background-color: #fee2e2; border-left: 6px solid #991b1b; opacity: 0.6; }
+        .status-aprovado { background-color: #dcfce7; border-left: 6px solid #16a34a; }
+        
+        /* Lixeira */
+        .status-deletado { background-color: #f3f4f6; border-left: 6px solid #4b5563; opacity: 0.5; filter: grayscale(0.5); }
+        
+        .card-cliente {
+            transition: all 0.3s;
+        }
+        .card-cliente:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
+        }
+        
+        .badge-vencido { background: #dc2626; color: white; }
+        .badge-vencendo { background: #eab308; color: white; }
+        .badge-em-dia { background: #16a34a; color: white; }
+        .badge-pendente { background: #f97316; color: white; }
+        .badge-rejeitado { background: #991b1b; color: white; }
+        .badge-deletado { background: #4b5563; color: white; }
+        
+        .tab-ativa {
+            background-color: #2563eb;
+            color: white;
+        }
+        
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .solicitacao-card {
+            transition: all 0.3s;
+            border: 2px solid transparent;
+        }
+        .solicitacao-card:hover {
+            border-color: #f97316;
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body class="p-6">
+    <!-- Tela de Login (inicialmente visível) -->
+    <div id="tela-login" class="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50">
+        <div class="bg-white w-full max-w-md p-8 rounded-[40px] shadow-2xl">
+            <div class="text-center mb-8">
+                <div class="text-5xl mb-2">🔐</div>
+                <h2 class="text-2xl font-bebas text-blue-600">PAINEL MASTER</h2>
+                <p class="text-xs text-gray-500">Acesso restrito</p>
+            </div>
+            <input id="email" type="email" placeholder="E-mail" class="w-full p-4 bg-slate-50 rounded-2xl border border-slate-200 mb-3 text-sm">
+            <input id="senha" type="password" placeholder="Senha" class="w-full p-4 bg-slate-50 rounded-2xl border border-slate-200 mb-4 text-sm">
+            <button onclick="Auth.login()" class="w-full bg-blue-600 text-white p-4 rounded-2xl font-black uppercase hover:bg-blue-700 transition">Entrar</button>
+            <div id="erro-login" class="mt-3 text-red-500 text-xs text-center hidden"></div>
+        </div>
+    </div>
+
+    <!-- Painel Master (inicialmente oculto) -->
+    <div id="painel-master" class="hidden max-w-7xl mx-auto">
+        <!-- Header -->
+        <header class="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-6 rounded-[30px] shadow-xl mb-8">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h1 class="text-3xl font-bebas tracking-wider">PAINEL MASTER</h1>
+                    <p class="text-blue-100 text-sm mt-1">Gestão completa de clientes e lojas</p>
+                </div>
+                <button onclick="Auth.logout()" class="bg-white/20 hover:bg-white/30 px-6 py-3 rounded-2xl text-sm font-black uppercase transition">
+                    <i class="fas fa-sign-out-alt mr-2"></i>Sair
+                </button>
+            </div>
+        </header>
+
+        <!-- Tabs de Navegação -->
+        <div class="bg-white p-2 rounded-[20px] shadow-lg mb-8 inline-flex gap-2 flex-wrap">
+            <button onclick="UI.switchTab('clientes')" id="tab-clientes" class="px-6 py-3 rounded-xl text-sm font-black tab-ativa">📋 CLIENTES</button>
+            <button onclick="UI.switchTab('solicitacoes')" id="tab-solicitacoes" class="px-6 py-3 rounded-xl text-sm font-black bg-gray-100 text-gray-600 hover:bg-gray-200">📝 SOLICITAÇÕES <span id="badge-solicitacoes" class="ml-2 bg-orange-500 text-white px-2 py-0.5 rounded-full text-[10px] hidden">0</span></button>
+            <button onclick="UI.switchTab('pendentes')" id="tab-pendentes" class="px-6 py-3 rounded-xl text-sm font-black bg-gray-100 text-gray-600 hover:bg-gray-200">⏳ PENDENTES</button>
+            <button onclick="UI.switchTab('lixeira')" id="tab-lixeira" class="px-6 py-3 rounded-xl text-sm font-black bg-gray-100 text-gray-600 hover:bg-gray-200">🗑️ LIXEIRA</button>
+        </div>
+
+        <!-- Seção Clientes Ativos -->
+        <div id="secao-clientes" class="block">
+            <!-- Cards de Resumo -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                <div class="bg-white p-6 rounded-[25px] shadow-lg border-l-8 border-green-500">
+                    <div class="text-3xl font-black text-green-600" id="total-em-dia">0</div>
+                    <div class="text-sm text-gray-500">Em dia</div>
+                </div>
+                <div class="bg-white p-6 rounded-[25px] shadow-lg border-l-8 border-yellow-500">
+                    <div class="text-3xl font-black text-yellow-600" id="total-vencendo">0</div>
+                    <div class="text-sm text-gray-500">Vencendo (3 dias)</div>
+                </div>
+                <div class="bg-white p-6 rounded-[25px] shadow-lg border-l-8 border-red-500">
+                    <div class="text-3xl font-black text-red-600" id="total-vencidos">0</div>
+                    <div class="text-sm text-gray-500">Vencidos</div>
+                </div>
+                <div class="bg-white p-6 rounded-[25px] shadow-lg border-l-8 border-gray-500">
+                    <div class="text-3xl font-black text-gray-600" id="total-bloqueados">0</div>
+                    <div class="text-sm text-gray-500">Bloqueados</div>
+                </div>
+            </div>
+
+            <!-- Filtros e Busca -->
+            <div class="bg-white p-6 rounded-[25px] shadow-lg mb-8">
+                <div class="flex flex-col md:flex-row gap-4 items-center justify-between">
+                    <div class="flex gap-2 flex-wrap">
+                        <button onclick="Filtro.todos()" id="filtro-todos" class="px-6 py-3 rounded-xl text-sm font-black bg-blue-600 text-white">TODOS</button>
+                        <button onclick="Filtro.emDia()" id="filtro-em-dia" class="px-6 py-3 rounded-xl text-sm font-black bg-gray-100 text-gray-600 hover:bg-gray-200">EM DIA</button>
+                        <button onclick="Filtro.vencendo()" id="filtro-vencendo" class="px-6 py-3 rounded-xl text-sm font-black bg-gray-100 text-gray-600 hover:bg-gray-200">VENCENDO</button>
+                        <button onclick="Filtro.vencidos()" id="filtro-vencidos" class="px-6 py-3 rounded-xl text-sm font-black bg-gray-100 text-gray-600 hover:bg-gray-200">VENCIDOS</button>
+                        <button onclick="Filtro.bloqueados()" id="filtro-bloqueados" class="px-6 py-3 rounded-xl text-sm font-black bg-gray-100 text-gray-600 hover:bg-gray-200">BLOQUEADOS</button>
+                    </div>
+                    <div class="relative w-full md:w-64">
+                        <input type="text" id="busca" placeholder="Buscar cliente..." class="w-full p-3 pl-10 bg-slate-50 rounded-xl border border-slate-200 text-sm" onkeyup="Filtro.buscar(this.value)">
+                        <i class="fas fa-search absolute left-3 top-3.5 text-gray-400 text-sm"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Lista de Clientes Ativos -->
+            <div class="bg-white rounded-[25px] shadow-lg overflow-hidden">
+                <div class="bg-gray-50 p-4 border-b border-gray-200">
+                    <h2 class="font-bebas text-xl text-gray-700">CLIENTES ATIVOS</h2>
+                </div>
+                <div id="lista-clientes" class="divide-y divide-gray-100">
+                    <div class="text-center py-20 text-gray-400">
+                        <i class="fas fa-spinner fa-spin text-3xl mb-3"></i>
+                        <p>Carregando clientes...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Seção Solicitações (Cadastros Pendentes) -->
+        <div id="secao-solicitacoes" class="hidden">
+            <div class="bg-white rounded-[25px] shadow-lg overflow-hidden">
+                <div class="bg-orange-50 p-4 border-b border-orange-200">
+                    <h2 class="font-bebas text-xl text-orange-600">SOLICITAÇÕES DE CADASTRO</h2>
+                    <p class="text-xs text-orange-500 mt-1">Aprove ou rejeite novas lojas</p>
+                </div>
+                <div id="lista-solicitacoes" class="divide-y divide-gray-100">
+                    <!-- Solicitações serão carregadas aqui -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Seção Pendentes (Clientes com status pendente) -->
+        <div id="secao-pendentes" class="hidden">
+            <div class="bg-white rounded-[25px] shadow-lg overflow-hidden">
+                <div class="bg-yellow-50 p-4 border-b border-yellow-200">
+                    <h2 class="font-bebas text-xl text-yellow-600">CLIENTES PENDENTES</h2>
+                    <p class="text-xs text-yellow-500 mt-1">Clientes que ainda não foram aprovados</p>
+                </div>
+                <div id="lista-pendentes" class="divide-y divide-gray-100">
+                    <!-- Pendentes serão carregados aqui -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Seção Lixeira -->
+        <div id="secao-lixeira" class="hidden">
+            <div class="bg-white rounded-[25px] shadow-lg overflow-hidden">
+                <div class="bg-gray-700 p-4 border-b border-gray-600">
+                    <h2 class="font-bebas text-xl text-white">LIXEIRA</h2>
+                    <p class="text-xs text-gray-300 mt-1">Lojas excluídas (não visíveis para clientes)</p>
+                </div>
+                <div id="lista-lixeira" class="divide-y divide-gray-100">
+                    <!-- Itens da lixeira serão carregados aqui -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Editar Vencimento -->
+    <div id="modal-editar-vencimento" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-white w-full max-w-md p-8 rounded-[40px] shadow-2xl">
+            <h3 class="text-2xl font-bebas text-blue-600 mb-4">Editar Vencimento</h3>
+            <div class="mb-4">
+                <label class="text-xs font-bold text-gray-500">Cliente:</label>
+                <div id="modal-cliente-nome" class="text-lg font-black"></div>
+            </div>
+            <div class="mb-6">
+                <label class="text-xs font-bold text-gray-500">Data de Vencimento</label>
+                <input type="date" id="modal-data-vencimento" class="w-full p-4 bg-slate-50 rounded-2xl border border-slate-200 text-sm mt-1">
+            </div>
+            <div class="flex gap-2">
+                <button onclick="Clientes.salvarVencimento()" class="flex-1 bg-green-600 text-white py-4 rounded-2xl font-black uppercase text-sm hover:bg-green-700">Salvar</button>
+                <button onclick="UI.fecharModalVencimento()" class="flex-1 bg-gray-200 text-gray-700 py-4 rounded-2xl font-black uppercase text-sm hover:bg-gray-300">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================================
+        // UTILS
+        // ============================================================================
+        const Utils = {
+            formatMoney: (value) => {
+                return `R$ ${Number(value || 0).toFixed(2).replace('.', ',')}`;
+            },
+            
+            formatDate: (date) => {
+                if (!date) return '---';
+                const d = new Date(date);
+                return d.toLocaleDateString('pt-BR');
+            },
+            
+            formatDateTime: (timestamp) => {
+                if (!timestamp) return '---';
+                const d = new Date(timestamp);
+                return d.toLocaleString('pt-BR');
+            },
+            
+            getFirebaseRefs: () => {
+                if (!window.firebaseDb || !window.firebaseAuth || !window.firebaseModules) {
+                    throw new Error("Firebase não inicializado");
+                }
+                return {
+                    db: window.firebaseDb,
+                    auth: window.firebaseAuth,
+                    firestore: window.firebaseModules.firestore,
+                    authModules: window.firebaseModules.auth
+                };
+            },
+            
+            showToast: (title, icon = 'success', timer = 2000) => {
+                Swal.fire({
+                    title,
+                    icon,
+                    timer,
+                    showConfirmButton: false,
+                    toast: true,
+                    position: 'top-end'
+                });
+            },
+            
+            showAlert: (title, text, icon = 'warning') => {
+                Swal.fire({ title, text, icon, confirmButtonColor: '#2563eb' });
+            },
+            
+            showConfirm: async (title, text) => {
+                return await Swal.fire({
+                    title,
+                    text,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#2563eb',
+                    cancelButtonColor: '#6b7280',
+                    confirmButtonText: 'Sim',
+                    cancelButtonText: 'Cancelar'
+                });
+            }
+        };
+
+        // ============================================================================
+        // AUTH - Autenticação Master
+        // ============================================================================
+        const Auth = {
+            async login() {
+                const email = document.getElementById('email').value;
+                const senha = document.getElementById('senha').value;
+                const erroDiv = document.getElementById('erro-login');
+                
+                erroDiv.classList.add('hidden');
+                
+                if (!email || !senha) {
+                    erroDiv.textContent = "Preencha email e senha!";
+                    erroDiv.classList.remove('hidden');
+                    return;
+                }
+                
+                try {
+                    const { auth, authModules } = Utils.getFirebaseRefs();
+                    
+                    await authModules.signInWithEmailAndPassword(auth, email, senha);
+                    
+                    document.getElementById('tela-login').classList.add('hidden');
+                    document.getElementById('painel-master').classList.remove('hidden');
+                    
+                    // Iniciar listeners
+                    Dados.carregarTudo();
+                    
+                } catch (error) {
+                    console.error("Erro no login:", error);
+                    erroDiv.textContent = "Email ou senha incorretos!";
+                    erroDiv.classList.remove('hidden');
+                }
+            },
+            
+            async logout() {
+                const { auth, authModules } = Utils.getFirebaseRefs();
+                await authModules.signOut(auth);
+                location.reload();
+            }
+        };
+
+        // ============================================================================
+        // DADOS - Gerenciamento de dados do Firebase
+        // ============================================================================
+        const Dados = {
+            clientes: [],
+            solicitacoes: [],
+            listeners: [],
+            
+            async carregarTudo() {
+                await this.carregarClientes();
+                await this.carregarSolicitacoes();
+            },
+            
+            async carregarClientes() {
+                try {
+                    const { firestore, db } = Utils.getFirebaseRefs();
+                    
+                    const clientesRef = firestore.collection(db, "clientes");
+                    const clientesSnap = await firestore.getDocs(clientesRef);
+                    
+                    this.clientes = clientesSnap.docs.map(doc => {
+                        const data = doc.data();
+                        return {
+                            id: doc.id,
+                            ...data,
+                            data_vencimento: data.data_vencimento || null,
+                            status_cadastro: data.status_cadastro || 'aprovado',
+                            deletado: data.deletado || false,
+                            tipo: 'cliente'
+                        };
+                    });
+                    
+                    console.log("Clientes carregados:", this.clientes.length);
+                    
+                    this.processarStatus();
+                    
+                    Clientes.atualizarUI();
+                    Clientes.atualizarPendentes();
+                    Clientes.atualizarLixeira();
+                    
+                } catch (error) {
+                    console.error("Erro ao carregar clientes:", error);
+                }
+            },
+            
+            async carregarSolicitacoes() {
+                try {
+                    const { firestore, db } = Utils.getFirebaseRefs();
+                    
+                    const solicitacoesRef = firestore.collection(db, "solicitacoes_lojas");
+                    const solicitacoesSnap = await firestore.getDocs(solicitacoesRef);
+                    
+                    this.solicitacoes = solicitacoesSnap.docs.map(doc => {
+                        const data = doc.data();
+                        return {
+                            id: doc.id,
+                            ...data,
+                            tipo: 'solicitacao',
+                            data_cadastro: data.data_cadastro?.toDate ? data.data_cadastro.toDate().getTime() : data.data_cadastro
+                        };
+                    }).filter(s => s.status === 'pendente');
+                    
+                    console.log("Solicitações carregadas:", this.solicitacoes.length);
+                    
+                    const badge = document.getElementById('badge-solicitacoes');
+                    if (this.solicitacoes.length > 0) {
+                        badge.classList.remove('hidden');
+                        badge.innerText = this.solicitacoes.length;
+                    } else {
+                        badge.classList.add('hidden');
+                    }
+                    
+                    this.atualizarSolicitacoesUI();
+                    
+                } catch (error) {
+                    console.error("Erro ao carregar solicitações:", error);
+                }
+            },
+            
+            processarStatus() {
+                const hoje = new Date();
+                hoje.setHours(0, 0, 0, 0);
+                
+                this.clientes.forEach(cliente => {
+                    if (cliente.deletado) return;
+                    
+                    if (cliente.status_assinatura === 'bloqueado') {
+                        cliente.status_calculado = 'bloqueado';
+                        return;
+                    }
+                    
+                    if (!cliente.data_vencimento) {
+                        cliente.status_calculado = 'em-dia';
+                        return;
+                    }
+                    
+                    const vencimento = new Date(cliente.data_vencimento);
+                    vencimento.setHours(0, 0, 0, 0);
+                    
+                    const diffTime = vencimento - hoje;
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    
+                    if (diffDays < 0) {
+                        cliente.status_calculado = 'vencido';
+                    } else if (diffDays <= 3) {
+                        cliente.status_calculado = 'vencendo';
+                    } else {
+                        cliente.status_calculado = 'em-dia';
+                    }
+                });
+            },
+            
+            async aprovarSolicitacao(solicitacao) {
+                try {
+                    const { firestore, db, authModules, auth } = Utils.getFirebaseRefs();
+                    
+                    // Criar ID da loja
+                    const lojaId = 'loja_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+                    
+                    // 1. CRIAR USUÁRIO NO FIREBASE AUTHENTICATION
+                    const userCredential = await authModules.createUserWithEmailAndPassword(
+                        auth, 
+                        solicitacao.email, 
+                        solicitacao.senha || '123456' // Usar a senha fornecida ou padrão
+                    );
+                    
+                    const uid = userCredential.user.uid;
+                    
+                    // 2. Criar documento da loja
+                    await firestore.setDoc(firestore.doc(db, "lojas", lojaId), {
+                        nome_loja: solicitacao.nome_loja,
+                        status: "ativo",
+                        tipo_loja: "restaurante",
+                        data_criacao: firestore.Timestamp.now()
+                    });
+                    
+                    // 3. Criar configurações da loja
+                    await firestore.setDoc(firestore.doc(db, "lojas", lojaId, "configuracoes", "geral"), {
+                        nome_loja: solicitacao.nome_loja,
+                        tipo_loja: "restaurante",
+                        loja_aberta: true,
+                        taxa_base: 6,
+                        preco_km: 2.5,
+                        pedido_minimo: 35,
+                        logo_url: "",
+                        usa_montador: false,
+                        status_assinatura: "ativo",
+                        data_vencimento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+                    });
+                    
+                    // 4. Criar cliente (usando o UID do Authentication)
+                    await firestore.setDoc(firestore.doc(db, "clientes", uid), {
+                        nome: solicitacao.responsavel || solicitacao.nome_loja,
+                        whatsapp: solicitacao.whatsapp || "",
+                        email: solicitacao.email || "",
+                        lojaId: lojaId,
+                        tipo_loja: "restaurante",
+                        status_assinatura: "ativo",
+                        data_vencimento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                        plano: "basic",
+                        status_cadastro: "aprovado",
+                        data_criacao: firestore.Timestamp.now()
+                    });
+                    
+                    // 5. Marcar solicitação como aprovada
+                    await firestore.updateDoc(firestore.doc(db, "solicitacoes_lojas", solicitacao.id), {
+                        status: "aprovado",
+                        data_aprovacao: firestore.Timestamp.now(),
+                        uid: uid,
+                        lojaId: lojaId
+                    });
+                    
+                    // 6. Mostrar credenciais para o admin
+                    Swal.fire({
+                        title: '✅ LOJA APROVADA!',
+                        html: `
+                            <div style="text-align: left">
+                                <p><strong>Loja:</strong> ${solicitacao.nome_loja}</p>
+                                <p><strong>Responsável:</strong> ${solicitacao.responsavel}</p>
+                                <p><strong>Email:</strong> ${solicitacao.email}</p>
+                                <p><strong>Senha:</strong> ${solicitacao.senha || '123456'}</p>
+                                <hr class="my-3">
+                                <p class="text-green-600">✓ Usuário criado no Authentication</p>
+                                <p class="text-green-600">✓ Documento da loja criado</p>
+                                <p class="text-green-600">✓ Cliente vinculado</p>
+                            </div>
+                        `,
+                        icon: 'success',
+                        confirmButtonColor: '#2563eb'
+                    });
+                    
+                    // Recarregar dados
+                    await this.carregarTudo();
+                    
+                } catch (error) {
+                    console.error("Erro detalhado:", error);
+                    
+                    let mensagem = "Erro ao aprovar solicitação: " + error.message;
+                    if (error.code === 'auth/email-already-in-use') {
+                        mensagem = "Este email já está sendo usado por outra loja!";
+                    } else if (error.code === 'auth/weak-password') {
+                        mensagem = "A senha deve ter pelo menos 6 caracteres!";
+                    }
+                    
+                    Utils.showAlert('Erro', mensagem, 'error');
+                }
+            },
+            
+            async rejeitarSolicitacao(id) {
+                try {
+                    const { firestore, db } = Utils.getFirebaseRefs();
+                    
+                    await firestore.updateDoc(firestore.doc(db, "solicitacoes_lojas", id), {
+                        status: "rejeitado",
+                        data_rejeicao: firestore.Timestamp.now()
+                    });
+                    
+                    Utils.showToast('Solicitação rejeitada!');
+                    
+                    await this.carregarTudo();
+                    
+                } catch (error) {
+                    console.error("Erro ao rejeitar solicitação:", error);
+                    Utils.showAlert('Erro', 'Não foi possível rejeitar a solicitação.', 'error');
+                }
+            },
+            
+            atualizarSolicitacoesUI() {
+                const container = document.getElementById('lista-solicitacoes');
+                
+                if (this.solicitacoes.length === 0) {
+                    container.innerHTML = `
+                        <div class="text-center py-16 text-gray-400">
+                            <i class="fas fa-inbox text-4xl mb-3 opacity-30"></i>
+                            <p>Nenhuma solicitação pendente</p>
+                        </div>`;
+                    return;
+                }
+                
+                let html = '';
+                this.solicitacoes.forEach(sol => {
+                    const data = sol.data_cadastro ? new Date(sol.data_cadastro).toLocaleDateString('pt-BR') : '---';
+                    
+                    html += `
+                        <div class="solicitacao-card p-6 bg-orange-50">
+                            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-3 mb-2">
+                                        <span class="text-2xl">🏪</span>
+                                        <h3 class="font-black text-lg text-gray-800">${sol.nome_loja || '---'}</h3>
+                                        <span class="bg-orange-500 text-white px-3 py-1 rounded-full text-[10px] font-black">NOVA SOLICITAÇÃO</span>
+                                    </div>
+                                    
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
+                                        <div>
+                                            <span class="text-gray-500 text-[10px] font-bold">RESPONSÁVEL</span>
+                                            <div>${sol.responsavel || '---'}</div>
+                                        </div>
+                                        <div>
+                                            <span class="text-gray-500 text-[10px] font-bold">WHATSAPP</span>
+                                            <div>${sol.whatsapp || '---'}</div>
+                                        </div>
+                                        <div>
+                                            <span class="text-gray-500 text-[10px] font-bold">EMAIL</span>
+                                            <div>${sol.email || '---'}</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mt-2 text-xs text-gray-500">
+                                        Solicitado em: ${data}
+                                    </div>
+                                </div>
+                                
+                                <div class="flex gap-2">
+                                    <button onclick="Dados.aprovarSolicitacao(${JSON.stringify(sol).replace(/"/g, '&quot;')})" 
+                                            class="bg-green-500 text-white hover:bg-green-600 px-6 py-3 rounded-xl text-sm font-black transition">
+                                        <i class="fas fa-check mr-2"></i>Aprovar
+                                    </button>
+                                    <button onclick="Dados.rejeitarSolicitacao('${sol.id}')" 
+                                            class="bg-red-500 text-white hover:bg-red-600 px-6 py-3 rounded-xl text-sm font-black transition">
+                                        <i class="fas fa-times mr-2"></i>Rejeitar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>`;
+                });
+                
+                container.innerHTML = html;
+            }
+        };
+
+        // ============================================================================
+        // CLIENTES - Gerenciamento de clientes
+        // ============================================================================
+        const Clientes = {
+            filtroAtual: 'todos',
+            termoBusca: '',
+            
+            getClientesAtivos() {
+                return Dados.clientes.filter(c => !c.deletado && c.status_cadastro === 'aprovado');
+            },
+            
+            getPendentes() {
+                return Dados.clientes.filter(c => !c.deletado && c.status_cadastro === 'pendente');
+            },
+            
+            getLixeira() {
+                return Dados.clientes.filter(c => c.deletado === true);
+            },
+            
+            getFiltrados() {
+                let filtrados = this.getClientesAtivos();
+                
+                if (this.filtroAtual !== 'todos') {
+                    filtrados = filtrados.filter(c => c.status_calculado === this.filtroAtual);
+                }
+                
+                if (this.termoBusca) {
+                    const termo = this.termoBusca.toLowerCase();
+                    filtrados = filtrados.filter(c => 
+                        (c.nome && c.nome.toLowerCase().includes(termo)) ||
+                        (c.whatsapp && c.whatsapp.includes(termo)) ||
+                        (c.lojaId && c.lojaId.toLowerCase().includes(termo))
+                    );
+                }
+                
+                return filtrados;
+            },
+            
+            async atualizarCliente(id, dados) {
+                try {
+                    const { firestore, db } = Utils.getFirebaseRefs();
+                    const clienteRef = firestore.doc(db, "clientes", id);
+                    
+                    await firestore.updateDoc(clienteRef, dados);
+                    
+                    const cliente = Dados.clientes.find(c => c.id === id);
+                    if (cliente && cliente.lojaId) {
+                        const configRef = firestore.doc(db, "lojas", cliente.lojaId, "configuracoes", "geral");
+                        await firestore.setDoc(configRef, {
+                            status_assinatura: dados.status_assinatura || cliente.status_assinatura,
+                            data_vencimento: dados.data_vencimento || cliente.data_vencimento,
+                            updated_at: new Date().getTime()
+                        }, { merge: true });
+                        
+                        const lojaRef = firestore.doc(db, "lojas", cliente.lojaId);
+                        
+                        if (dados.deletado === true || dados.status_assinatura === 'bloqueado') {
+                            await firestore.updateDoc(lojaRef, { status: 'bloqueado' });
+                        } else if (dados.status_assinatura === 'ativo' && dados.deletado !== true) {
+                            await firestore.updateDoc(lojaRef, { status: 'ativo' });
+                        }
+                    }
+                    
+                    await Dados.carregarClientes();
+                    Utils.showToast('Cliente atualizado!');
+                    
+                } catch (error) {
+                    console.error("Erro ao atualizar cliente:", error);
+                    Utils.showAlert('Erro', 'Não foi possível atualizar o cliente.', 'error');
+                }
+            },
+            
+            async ativar(id) {
+                const resultado = await Utils.showConfirm('Ativar Cliente?', 'O status será alterado para ativo.');
+                if (!resultado.isConfirmed) return;
+                
+                await this.atualizarCliente(id, { 
+                    status_assinatura: 'ativo',
+                    status_cadastro: 'aprovado',
+                    deletado: false 
+                });
+            },
+            
+            async bloquear(id) {
+                const resultado = await Utils.showConfirm('Bloquear Cliente?', 'A loja será bloqueada imediatamente.');
+                if (!resultado.isConfirmed) return;
+                
+                await this.atualizarCliente(id, { status_assinatura: 'bloqueado' });
+            },
+            
+            async aprovar(id) {
+                const resultado = await Utils.showConfirm('Aprovar Cadastro?', 'O cliente terá acesso liberado ao sistema.');
+                if (!resultado.isConfirmed) return;
+                
+                await this.atualizarCliente(id, { 
+                    status_cadastro: 'aprovado',
+                    status_assinatura: 'ativo'
+                });
+            },
+            
+            async rejeitar(id) {
+                const resultado = await Utils.showConfirm('Rejeitar Cadastro?', 'O cliente não poderá acessar o sistema.');
+                if (!resultado.isConfirmed) return;
+                
+                await this.atualizarCliente(id, { 
+                    status_cadastro: 'rejeitado',
+                    status_assinatura: 'bloqueado'
+                });
+            },
+            
+            async moverParaLixeira(id) {
+                const resultado = await Utils.showConfirm('Mover para Lixeira?', 'A loja será desativada e movida para a lixeira.');
+                if (!resultado.isConfirmed) return;
+                
+                await this.atualizarCliente(id, { 
+                    deletado: true,
+                    status_assinatura: 'bloqueado',
+                    data_exclusao: new Date().getTime()
+                });
+            },
+            
+            async restaurar(id) {
+                const resultado = await Utils.showConfirm('Restaurar Loja?', 'A loja voltará mas permanecerá bloqueada até o pagamento.');
+                if (!resultado.isConfirmed) return;
+                
+                await this.atualizarCliente(id, { 
+                    deletado: false,
+                    status_assinatura: 'bloqueado'
+                });
+            },
+            
+            async excluirDefinitivamente(id) {
+                const resultado = await Utils.showConfirm('EXCLUSÃO DEFINITIVA!', 'Esta ação é irreversível. A loja será completamente removida do sistema. Continuar?');
+                if (!resultado.isConfirmed) return;
+                
+                try {
+                    const { firestore, db } = Utils.getFirebaseRefs();
+                    
+                    const cliente = Dados.clientes.find(c => c.id === id);
+                    
+                    if (cliente && cliente.lojaId) {
+                        const lojaRef = firestore.doc(db, "lojas", cliente.lojaId);
+                        await firestore.deleteDoc(lojaRef);
+                    }
+                    
+                    const clienteRef = firestore.doc(db, "clientes", id);
+                    await firestore.deleteDoc(clienteRef);
+                    
+                    await Dados.carregarClientes();
+                    Utils.showToast('Cliente excluído permanentemente!');
+                    
+                } catch (error) {
+                    console.error("Erro ao excluir permanentemente:", error);
+                    Utils.showAlert('Erro', 'Não foi possível excluir permanentemente.', 'error');
+                }
+            },
+            
+            async editarVencimento(id) {
+                const cliente = Dados.clientes.find(c => c.id === id);
+                if (!cliente) return;
+                
+                document.getElementById('modal-cliente-nome').innerText = cliente.nome || '---';
+                document.getElementById('modal-data-vencimento').value = cliente.data_vencimento || '';
+                document.getElementById('modal-editar-vencimento').dataset.clienteId = id;
+                
+                document.getElementById('modal-editar-vencimento').classList.remove('hidden');
+            },
+            
+            async salvarVencimento() {
+                const id = document.getElementById('modal-editar-vencimento').dataset.clienteId;
+                const novaData = document.getElementById('modal-data-vencimento').value;
+                
+                if (!novaData) {
+                    Utils.showAlert('Atenção', 'Selecione uma data!', 'warning');
+                    return;
+                }
+                
+                await this.atualizarCliente(id, { data_vencimento: novaData });
+                UI.fecharModalVencimento();
+            },
+            
+            atualizarUI() {
+                const filtrados = this.getFiltrados();
+                
+                const emDia = Dados.clientes.filter(c => !c.deletado && c.status_cadastro === 'aprovado' && c.status_calculado === 'em-dia').length;
+                const vencendo = Dados.clientes.filter(c => !c.deletado && c.status_cadastro === 'aprovado' && c.status_calculado === 'vencendo').length;
+                const vencidos = Dados.clientes.filter(c => !c.deletado && c.status_cadastro === 'aprovado' && c.status_calculado === 'vencido').length;
+                const bloqueados = Dados.clientes.filter(c => !c.deletado && c.status_cadastro === 'aprovado' && c.status_assinatura === 'bloqueado').length;
+                
+                document.getElementById('total-em-dia').innerText = emDia;
+                document.getElementById('total-vencendo').innerText = vencendo;
+                document.getElementById('total-vencidos').innerText = vencidos;
+                document.getElementById('total-bloqueados').innerText = bloqueados;
+                
+                const container = document.getElementById('lista-clientes');
+                
+                if (filtrados.length === 0) {
+                    container.innerHTML = `
+                        <div class="text-center py-20 text-gray-400">
+                            <i class="fas fa-users text-4xl mb-3 opacity-30"></i>
+                            <p>Nenhum cliente ativo encontrado</p>
+                        </div>`;
+                    return;
+                }
+                
+                let html = '';
+                filtrados.sort((a, b) => {
+                    if (!a.data_vencimento) return 1;
+                    if (!b.data_vencimento) return -1;
+                    return new Date(a.data_vencimento) - new Date(b.data_vencimento);
+                }).forEach(cliente => {
+                    const statusClass = cliente.status_assinatura === 'bloqueado' ? 'status-bloqueado' :
+                                       cliente.status_calculado === 'vencido' ? 'status-vencido' :
+                                       cliente.status_calculado === 'vencendo' ? 'status-vencendo' : 'status-ativo';
+                    
+                    const hoje = new Date();
+                    hoje.setHours(0,0,0,0);
+                    const vencimento = cliente.data_vencimento ? new Date(cliente.data_vencimento) : null;
+                    let diasRestantes = '';
+                    
+                    if (vencimento && cliente.status_assinatura !== 'bloqueado') {
+                        vencimento.setHours(0,0,0,0);
+                        const diffTime = vencimento - hoje;
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                        
+                        if (diffDays < 0) {
+                            diasRestantes = `<span class="text-red-600 font-black">Vencido há ${Math.abs(diffDays)} dias</span>`;
+                        } else if (diffDays === 0) {
+                            diasRestantes = `<span class="text-yellow-600 font-black">Vence hoje!</span>`;
+                        } else if (diffDays <= 3) {
+                            diasRestantes = `<span class="text-yellow-600 font-black">Vence em ${diffDays} dias</span>`;
+                        } else {
+                            diasRestantes = `<span class="text-green-600 font-black">Em dia</span>`;
+                        }
+                    }
+                    
+                    const tipoLojaIcon = {
+                        pizzaria: '🍕',
+                        hamburgueria: '🍔',
+                        restaurante: '🍽️',
+                        acai: '🥤'
+                    }[cliente.tipo_loja] || '🏪';
+                    
+                    html += `
+                        <div class="card-cliente p-6 ${statusClass}">
+                            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-3 mb-2">
+                                        <span class="text-2xl">${tipoLojaIcon}</span>
+                                        <h3 class="font-black text-lg text-gray-800">${cliente.nome || '---'}</h3>
+                                        ${cliente.status_assinatura === 'bloqueado' ? 
+                                            '<span class="bg-gray-500 text-white px-3 py-1 rounded-full text-[10px] font-black">BLOQUEADO</span>' : ''}
+                                    </div>
+                                    
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
+                                        <div>
+                                            <span class="text-gray-500 text-[10px] font-bold">LOJA ID</span>
+                                            <div class="font-mono text-xs">${cliente.lojaId || '---'}</div>
+                                        </div>
+                                        <div>
+                                            <span class="text-gray-500 text-[10px] font-bold">WHATSAPP</span>
+                                            <div>${cliente.whatsapp || '---'}</div>
+                                        </div>
+                                        <div>
+                                            <span class="text-gray-500 text-[10px] font-bold">PLANO</span>
+                                            <div class="uppercase font-bold">${cliente.plano || 'basic'}</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mt-3 flex items-center gap-3">
+                                        <span class="text-gray-500 text-[10px] font-bold">VENCIMENTO:</span>
+                                        <span class="font-mono text-sm">${Utils.formatDate(cliente.data_vencimento)}</span>
+                                        ${diasRestantes ? `<span class="text-xs font-black">${diasRestantes}</span>` : ''}
+                                    </div>
+                                </div>
+                                
+                                <div class="flex gap-2">
+                                    ${cliente.status_assinatura !== 'bloqueado' ? `
+                                        <button onclick="Clientes.bloquear('${cliente.id}')" 
+                                                class="bg-gray-200 text-gray-700 hover:bg-gray-300 w-10 h-10 rounded-xl transition" title="Bloquear">
+                                            <i class="fas fa-ban"></i>
+                                        </button>
+                                    ` : `
+                                        <button onclick="Clientes.ativar('${cliente.id}')" 
+                                                class="bg-green-200 text-green-700 hover:bg-green-300 w-10 h-10 rounded-xl transition" title="Ativar">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                    `}
+                                    
+                                    <button onclick="Clientes.editarVencimento('${cliente.id}')" 
+                                            class="bg-blue-100 text-blue-700 hover:bg-blue-200 w-10 h-10 rounded-xl transition" title="Editar Vencimento">
+                                        <i class="fas fa-calendar-alt"></i>
+                                    </button>
+                                    
+                                    <button onclick="Cobranca.enviar('${cliente.id}')" 
+                                            class="bg-green-100 text-green-700 hover:bg-green-200 w-10 h-10 rounded-xl transition" title="Cobrar via WhatsApp">
+                                        <i class="fab fa-whatsapp"></i>
+                                    </button>
+                                    
+                                    <button onclick="Clientes.moverParaLixeira('${cliente.id}')" 
+                                            class="bg-red-100 text-red-700 hover:bg-red-200 w-10 h-10 rounded-xl transition" title="Mover para Lixeira">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>`;
+                });
+                
+                container.innerHTML = html;
+            },
+            
+            atualizarPendentes() {
+                const pendentes = this.getPendentes();
+                const container = document.getElementById('lista-pendentes');
+                
+                if (pendentes.length === 0) {
+                    container.innerHTML = `
+                        <div class="text-center py-16 text-gray-400">
+                            <i class="fas fa-clock text-4xl mb-3 opacity-30"></i>
+                            <p>Nenhum cliente pendente</p>
+                        </div>`;
+                    return;
+                }
+                
+                let html = '';
+                pendentes.forEach(cliente => {
+                    const tipoLojaIcon = {
+                        pizzaria: '🍕',
+                        hamburgueria: '🍔',
+                        restaurante: '🍽️',
+                        acai: '🥤'
+                    }[cliente.tipo_loja] || '🏪';
+                    
+                    html += `
+                        <div class="card-cliente p-6 status-pendente">
+                            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-3 mb-2">
+                                        <span class="text-2xl">${tipoLojaIcon}</span>
+                                        <h3 class="font-black text-lg text-gray-800">${cliente.nome || '---'}</h3>
+                                        <span class="bg-yellow-500 text-white px-3 py-1 rounded-full text-[10px] font-black">PENDENTE</span>
+                                    </div>
+                                    
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                                        <div>
+                                            <span class="text-gray-500 text-[10px] font-bold">LOJA ID</span>
+                                            <div class="font-mono text-xs">${cliente.lojaId || '---'}</div>
+                                        </div>
+                                        <div>
+                                            <span class="text-gray-500 text-[10px] font-bold">WHATSAPP</span>
+                                            <div>${cliente.whatsapp || '---'}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex gap-2">
+                                    <button onclick="Clientes.aprovar('${cliente.id}')" 
+                                            class="bg-green-500 text-white hover:bg-green-600 px-4 py-2 rounded-xl text-sm font-black transition">
+                                        <i class="fas fa-check mr-2"></i>Aprovar
+                                    </button>
+                                    <button onclick="Clientes.rejeitar('${cliente.id}')" 
+                                            class="bg-red-500 text-white hover:bg-red-600 px-4 py-2 rounded-xl text-sm font-black transition">
+                                        <i class="fas fa-times mr-2"></i>Rejeitar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>`;
+                });
+                
+                container.innerHTML = html;
+            },
+            
+            atualizarLixeira() {
+                const lixeira = this.getLixeira();
+                const container = document.getElementById('lista-lixeira');
+                
+                if (lixeira.length === 0) {
+                    container.innerHTML = `
+                        <div class="text-center py-16 text-gray-400">
+                            <i class="fas fa-trash-alt text-4xl mb-3 opacity-30"></i>
+                            <p>Lixeira vazia</p>
+                        </div>`;
+                    return;
+                }
+                
+                let html = '';
+                lixeira.forEach(cliente => {
+                    const tipoLojaIcon = {
+                        pizzaria: '🍕',
+                        hamburgueria: '🍔',
+                        restaurante: '🍽️',
+                        acai: '🥤'
+                    }[cliente.tipo_loja] || '🏪';
+                    
+                    html += `
+                        <div class="card-cliente p-6 status-deletado">
+                            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-3 mb-2">
+                                        <span class="text-2xl">${tipoLojaIcon}</span>
+                                        <h3 class="font-black text-lg text-gray-800">${cliente.nome || '---'}</h3>
+                                        <span class="bg-gray-600 text-white px-3 py-1 rounded-full text-[10px] font-black">EXCLUÍDO</span>
+                                    </div>
+                                    
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                                        <div>
+                                            <span class="text-gray-500 text-[10px] font-bold">LOJA ID</span>
+                                            <div class="font-mono text-xs">${cliente.lojaId || '---'}</div>
+                                        </div>
+                                        <div>
+                                            <span class="text-gray-500 text-[10px] font-bold">EXCLUÍDO EM</span>
+                                            <div>${Utils.formatDateTime(cliente.data_exclusao)}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex gap-2">
+                                    <button onclick="Clientes.restaurar('${cliente.id}')" 
+                                            class="bg-blue-500 text-white hover:bg-blue-600 px-4 py-2 rounded-xl text-sm font-black transition">
+                                        <i class="fas fa-undo-alt mr-2"></i>Restaurar
+                                    </button>
+                                    <button onclick="Clientes.excluirDefinitivamente('${cliente.id}')" 
+                                            class="bg-red-600 text-white hover:bg-red-700 px-4 py-2 rounded-xl text-sm font-black transition">
+                                        <i class="fas fa-times-circle mr-2"></i>Excluir
+                                    </button>
+                                </div>
+                            </div>
+                        </div>`;
+                });
+                
+                container.innerHTML = html;
+            }
+        };
+
+        // ============================================================================
+        // COBRANCA - Sistema de cobrança via WhatsApp
+        // ============================================================================
+        const Cobranca = {
+            enviar(id) {
+                const cliente = Dados.clientes.find(c => c.id === id);
+                if (!cliente || !cliente.whatsapp) {
+                    Utils.showAlert('Atenção', 'Cliente não tem WhatsApp cadastrado!', 'warning');
+                    return;
+                }
+                
+                const hoje = new Date();
+                hoje.setHours(0,0,0,0);
+                const vencimento = cliente.data_vencimento ? new Date(cliente.data_vencimento) : null;
+                
+                let mensagem = '';
+                
+                if (!vencimento) {
+                    mensagem = `Olá ${cliente.nome || ''}! Sua assinatura está ativa. Qualquer dúvida, estamos à disposição.`;
+                } else {
+                    vencimento.setHours(0,0,0,0);
+                    const diffTime = vencimento - hoje;
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    
+                    if (diffDays < 0) {
+                        mensagem = `Olá ${cliente.nome || ''}! Sua assinatura está *VENCIDA* há ${Math.abs(diffDays)} dias. Para evitar o bloqueio do sistema, regularize o pagamento o quanto antes.`;
+                    } else if (diffDays <= 3) {
+                        mensagem = `Olá ${cliente.nome || ''}! Sua assinatura vence em *${diffDays} ${diffDays === 1 ? 'dia' : 'dias'}*. Não deixe para última hora e evite o bloqueio do sistema.`;
+                    } else {
+                        mensagem = `Olá ${cliente.nome || ''}! Sua assinatura está em dia. Obrigado pela confiança!`;
+                    }
+                }
+                
+                const numeroLimpo = cliente.whatsapp.replace(/\D/g, '');
+                let numeroCompleto = numeroLimpo;
+                if (!numeroLimpo.startsWith('55') && numeroLimpo.length === 11) {
+                    numeroCompleto = '55' + numeroLimpo;
+                }
+                
+                window.open(`https://wa.me/${numeroCompleto}?text=${encodeURIComponent(mensagem)}`, '_blank');
+            }
+        };
+
+        // ============================================================================
+        // FILTRO - Sistema de filtros
+        // ============================================================================
+        const Filtro = {
+            todos() {
+                Clientes.filtroAtual = 'todos';
+                this.atualizarBotoes('filtro-todos');
+                Clientes.atualizarUI();
+            },
+            
+            emDia() {
+                Clientes.filtroAtual = 'em-dia';
+                this.atualizarBotoes('filtro-em-dia');
+                Clientes.atualizarUI();
+            },
+            
+            vencendo() {
+                Clientes.filtroAtual = 'vencendo';
+                this.atualizarBotoes('filtro-vencendo');
+                Clientes.atualizarUI();
+            },
+            
+            vencidos() {
+                Clientes.filtroAtual = 'vencido';
+                this.atualizarBotoes('filtro-vencidos');
+                Clientes.atualizarUI();
+            },
+            
+            bloqueados() {
+                Clientes.filtroAtual = 'bloqueado';
+                this.atualizarBotoes('filtro-bloqueados');
+                Clientes.atualizarUI();
+            },
+            
+            buscar(termo) {
+                Clientes.termoBusca = termo;
+                Clientes.atualizarUI();
+            },
+            
+            atualizarBotoes(ativoId) {
+                const botoes = ['filtro-todos', 'filtro-em-dia', 'filtro-vencendo', 'filtro-vencidos', 'filtro-bloqueados'];
+                botoes.forEach(id => {
+                    const btn = document.getElementById(id);
+                    if (btn) {
+                        btn.className = id === ativoId 
+                            ? "px-6 py-3 rounded-xl text-sm font-black bg-blue-600 text-white"
+                            : "px-6 py-3 rounded-xl text-sm font-black bg-gray-100 text-gray-600 hover:bg-gray-200";
+                    }
+                });
+            }
+        };
+
+        // ============================================================================
+        // UI - Interface
+        // ============================================================================
+        const UI = {
+            switchTab(tab) {
+                const tabs = {
+                    clientes: { btn: 'tab-clientes', secao: 'secao-clientes' },
+                    solicitacoes: { btn: 'tab-solicitacoes', secao: 'secao-solicitacoes' },
+                    pendentes: { btn: 'tab-pendentes', secao: 'secao-pendentes' },
+                    lixeira: { btn: 'tab-lixeira', secao: 'secao-lixeira' }
+                };
+                
+                Object.values(tabs).forEach(t => {
+                    document.getElementById(t.btn).className = "px-6 py-3 rounded-xl text-sm font-black bg-gray-100 text-gray-600 hover:bg-gray-200";
+                    document.getElementById(t.secao).classList.add('hidden');
+                });
+                
+                document.getElementById(tabs[tab].btn).className = "px-6 py-3 rounded-xl text-sm font-black tab-ativa";
+                document.getElementById(tabs[tab].secao).classList.remove('hidden');
+            },
+            
+            fecharModalVencimento() {
+                document.getElementById('modal-editar-vencimento').classList.add('hidden');
+            }
+        };
+
+        // ============================================================================
+        // Exposição global
+        // ============================================================================
+        window.Auth = Auth;
+        window.Dados = Dados;
+        window.Clientes = Clientes;
+        window.Cobranca = Cobranca;
+        window.Filtro = Filtro;
+        window.UI = UI;
+    </script>
+</body>
+</html>
